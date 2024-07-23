@@ -23,17 +23,17 @@ describe("EventOrganizerService Contract Tests", function () {
         const EventOrganizerService = await ethers.getContractFactory("EventOrganizerService");
         const organizerService = await EventOrganizerService.deploy(museum.target, usdcToken.target);
 
-        ////console.log("MUSDC deployed to:", usdcToken.target);
-        ////console.log("Museum deployed to:", museum.target);
-        ////console.log("EventOrganizerService deployed to:", organizerService.target);
+        console.log("MUSDC deployed to:", usdcToken.target);
+        console.log("Museum deployed to:", museum.target);
+        console.log("EventOrganizerService deployed to:", organizerService.target);
 
         // Deploy ArtifactNFT
         const ArtifactNFT = await ethers.getContractFactory("ArtifactNFT");
         const artifactNFT1 = await ArtifactNFT.connect(owner).deploy("LusakaCollection", "LAGC", owner.address, "http://localhost:3000/api/nft/");
         const artifactNFT2 = await ArtifactNFT.connect(owner).deploy("WomenCollection", "WHMC", owner.address, "http://localhost:3000/api/nft/");
 
-        ////console.log("ArtifactNFT deployed to:", artifactNFT1.target);
-        ////console.log("ArtifactNFT deployed to:", artifactNFT2.target);
+        console.log("ArtifactNFT deployed to:", artifactNFT1.target);
+        console.log("ArtifactNFT deployed to:", artifactNFT2.target);
         // Organize an exhibit
         await organizerService.connect(owner).organizeExhibit(
 
@@ -46,9 +46,10 @@ describe("EventOrganizerService Contract Tests", function () {
             "Lusaka,Zambia", // location
             artifactNFT1.target, // ArtifactNFT address
             "Expressing the word with color", // details
-            "exhibit1" //exhibit id
+            "exhibit1", //exhibit id
+            100 // ticket capacity
         );
-        ////console.log("Organized Exhibit 1")
+            console.log("Organized Exhibit 1")
         await organizerService.connect(owner).organizeExhibit(
 
             "Womens History Museum",
@@ -60,15 +61,14 @@ describe("EventOrganizerService Contract Tests", function () {
             "New York,USA", // location
             artifactNFT2.target, // ArtifactNFT address
             "Those who walked before us and those to come.", // collection
-            "exhibit2"
+            "exhibit2", // exhibit id
+            200 // ticket capacity
         );
-        ////console.log("Organized Exhibit 2")
+         console.log("Organized Exhibit 2")
 
         // Retrieve the ExhibitNFT contract
-
-
         const exhibitNFTAddress = await organizerService.getExhibitNFTAddress("exhibit1");
-        ////console.log("ExhibitNFT deployed to:", exhibitNFTAddress)
+        console.log("ExhibitNFT deployed to:", exhibitNFTAddress)
         const ExhibitNFT = await ethers.getContractFactory("ExhibitNFT");
         const exhibitNFT = ExhibitNFT.attach(exhibitNFTAddress);
 
@@ -76,16 +76,14 @@ describe("EventOrganizerService Contract Tests", function () {
         const Escrow = await ethers.getContractFactory("EventEscrow");
         const escrow = Escrow.attach(escrowAddress);
 
-        ////console.log("ExhibitNFT deployed to:", exhibitNFT.target);
+       console.log("ExhibitNFT deployed to:", exhibitNFT.target);
 
         // Register the exhibit with the museum
         await museum.connect(owner).curateExhibit("exhibit1", exhibitNFT.target);
 
         // Purchase a few tickets
         await usdcToken.connect(funder).approve(museum.target, ethers.parseUnits("30", 18),); // Approve 3 USDC
-        await museum.connect(funder).purchaseTicket("exhibit1", ethers.parseUnits("10", 18)); // Purchase 1 ticket
-        await museum.connect(funder).purchaseTicket("exhibit1", ethers.parseUnits("10", 18)); // Purchase 1 ticket
-        await museum.connect(funder).purchaseTicket("exhibit1", ethers.parseUnits("10", 18)); // Purchase 1 ticket
+        await museum.connect(funder).purchaseTickets("exhibit1", 3, ethers.parseUnits("30", 18));
 
         return {
             museum,
@@ -114,8 +112,8 @@ describe("EventOrganizerService Contract Tests", function () {
             expect(await artifactNFT1.symbol()).to.equal("LAGC");
             expect(await artifactNFT1.owner()).to.equal(owner.address);
         });
-        it("should test the escrow balanbce increases after each purchase", async function () {
-            const { museum, owner, artifactNFT1, exhibitNFT, usdcToken, escrow } = await deployContracts();
+        it("should test the escrow balanbce increases after batch purchase", async function () {
+            const { museum, exhibitNFT, usdcToken, escrow } = await deployContracts();
 
             // Check that the ExhibitNFT was deployed
             expect(await museum.exhibits("exhibit1")).to.equal(exhibitNFT.target);
@@ -140,6 +138,19 @@ describe("EventOrganizerService Contract Tests", function () {
 
         });
 
+        it("should test the ticket capacity", async function () {
+            const { exhibitNFT } = await deployContracts();
+            expect(await exhibitNFT.ticketCapacity()).to.equal(100);
+        });
 
+        it("should fail when trying to purchase tickets exceeding capacity", async function () {
+            const { museum, funder, usdcToken } = await deployContracts();
+            
+            await usdcToken.connect(funder).approve(museum.target, ethers.parseUnits("1000", 18));
+            
+            await expect(
+                museum.connect(funder).purchaseTickets("exhibit1", 98, ethers.parseUnits("980", 18))
+            ).to.be.revertedWith("Exceeds maximum tickets");
+        });
     });
 });
