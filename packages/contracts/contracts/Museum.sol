@@ -16,7 +16,7 @@ contract Museum is Ownable {
         string exhibitId,
         address exhibitAddress
     );
-    event TicketPurchased(address buyer, address exhibit, uint256 tokenId);
+    event TicketsPurchased(address buyer, address exhibit, uint8 quantity, uint256 startTokenId);
     // emmit an event with the contract address, token address, and owner address
     event MuseumCreated(
         address museumAddress,
@@ -35,6 +35,7 @@ contract Museum is Ownable {
      * @param exhibitId The unique identifier for the exhibit.
      * @param exhibit The ExhibitNFT contract for the exhibit.
      */
+
     function curateExhibit(
         string memory exhibitId,
         ExhibitNFT exhibit
@@ -47,25 +48,29 @@ contract Museum is Ownable {
     /**
      * @dev Purchases a ticket for an exhibit.
      * @param exhibitId The unique identifier for the exhibit.
+     * @param quantity the number of tickets to purchase.
      * @param usdcAmount The amount of USDC sent to purchase the ticket.
      */
-    function purchaseTicket(
+
+    function purchaseTickets(
         string memory exhibitId,
+        uint8 quantity,
         uint256 usdcAmount
     ) external {
         ExhibitNFT exhibit = exhibits[exhibitId];
         require(address(exhibit) != address(0), "Exhibit does not exist.");
 
-        uint256 ticketPrice = exhibit.ticketPrice();
-        require(usdcAmount >= ticketPrice, "Insufficient USDC sent.");
+        uint256 totalCost = exhibit.ticketPrice() * quantity;
+        require(usdcAmount >= totalCost, "Insufficient tokens sent.");
 
         // Transfer the USDC directly from the buyer to the ExhibitNFT's escrow
         address escrowAddress = address(exhibit.escrow());
-        require(usdcToken.transferFrom(msg.sender, escrowAddress, ticketPrice));
-        // Mint the ticket to the buyer
-        uint256 tokenId = exhibit.mintTicket(msg.sender);
+        require(usdcToken.transferFrom(msg.sender, escrowAddress, totalCost), "Token transfer failed.");
 
-        emit TicketPurchased(msg.sender, address(exhibit), tokenId);
+        // Mint the ticket to the buyer
+        uint256 startTokenId = exhibit.mintTickets(msg.sender, quantity);
+
+        emit TicketsPurchased(msg.sender, address(exhibit), quantity, startTokenId);
     }
 
     function verifyTicketOwnership(

@@ -4,21 +4,23 @@ pragma solidity ^0.8.0;
 /* Category: Smart Contract
    Purpose: Manages Non-Fungible Tokens (NFTs) representing individual exhibits, ensuring ownership and access rights for event participants. */
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "erc721a/contracts/ERC721A.sol"
 import "./EventEscrow.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ExhibitNFT is ERC721, Ownable {
+
+contract ExhibitNFT is ERC721A, Ownable {
     uint256 public ticketPrice;
     EventEscrow public escrow;
-    uint256 private totalMinted;
     string public baseURI;
+    uint8 public ticketCapacity;
 
     string public location;
     address public artifactNFTAddress;
     string public details;
 
-    event TicketMinted(address exhibit, address to, uint256 tokenId);
+    event TicketsMinted(address exhibit, address to, uint8 quantity, uint256 startTokenId);
+
     // Define the event
     event ExhibitCreated(
         string name,
@@ -29,8 +31,23 @@ contract ExhibitNFT is ERC721, Ownable {
         string baseURI,
         string location,
         address artifactNFTAddress,
-        string details
+        string details,
+        uint8 ticketCapacity
     );
+
+    /**
+     * @dev Constructor to initialize the ExhibitNFT contract.
+     * @param name Name of the NFT.
+     * @param symbol Symbol of the NFT.
+     * @param _ticketPrice Price of a single ticket.
+     * @param _escrow Escrow contract address.
+     * @param _owner Owner address.
+     * @param _baseURI Base URI for NFT metadata.
+     * @param _location Location of the exhibit.
+     * @param _artifactNFTAddress Address of the related artifact NFT.
+     * @param _details Additional details about the exhibit.
+     * @param _ticketCapacity Maximum number of tickets that can be minted.
+     */
 
     constructor(
         string memory name,
@@ -41,12 +58,13 @@ contract ExhibitNFT is ERC721, Ownable {
         string memory _baseURI,
         string memory _location,
         address _artifactNFTAddress,
-        string memory _details
-    ) ERC721(name, symbol) Ownable(_owner) {
+        string memory _details,
+        uint8 _ticketCapacity
+    ) ERC721A(name, symbol) Ownable(_owner) {
         ticketPrice = _ticketPrice;
         escrow = _escrow;
         baseURI = _baseURI;
-        totalMinted = 0;
+        ticketCapacity = _ticketCapacity
 
         location = _location;
         artifactNFTAddress = _artifactNFTAddress;
@@ -63,15 +81,24 @@ contract ExhibitNFT is ERC721, Ownable {
             _location,
             _artifactNFTAddress,
             _details
+            _ticketCapacity
         );
     }
 
-    function mintTicket(address to) external onlyOwner returns (uint256) {
-        uint256 tokenId = totalMinted;
-        totalMinted++;
-        _safeMint(to, tokenId);
-        emit TicketMinted(address(this), to, tokenId);
-        return tokenId;
+    /** 
+     * @dev Mints tickets in batch to the specified address.
+     * @param to Address to mint the tickets to.
+     * @param quantity Number of tickets to mint.
+     * @return startTokenId The ID of the first token minted.
+     */
+
+    function mintTickets(address to, uint8 quantity) external onlyOwner returns (uint256) {
+        require (_totalMinted() + quantity <= ticketCapacity, "Exceeds maximum tickets");
+        uint256 startTokenId = _nextTokenId();
+        _mint(to, quantity);
+
+        emit TicketsMinted(adress(this), to, quantity, startTokenId);
+        return startTokenId;
     }
 
     function _baseURI() internal view override returns (string memory) {
