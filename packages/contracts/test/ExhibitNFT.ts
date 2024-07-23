@@ -72,21 +72,21 @@ describe('ExhibitNFT', function () {
     it('Should mint multiple tickets to an address', async function () {
       const { exhibitNFT, owner , funder} = await  loadFixture(deployContracts);
       const quantity = 3;
-      await exhibitNFT.connect(owner).mintTickets(funder.address, quantity);
+      await exhibitNFT.connect(owner).mintTickets([funder.address], [quantity]);
       expect(await exhibitNFT.balanceOf(funder.address)).to.equal(quantity);
     });
 
     it('Should mint a single ticket to an address', async function () {
       const { exhibitNFT, owner , funder} = await  loadFixture(deployContracts);
       const quantity = 1;
-      await exhibitNFT.connect(owner).mintTickets(funder.address, quantity);
+      await exhibitNFT.connect(owner).mintTickets([funder.address], [quantity]);
       expect(await exhibitNFT.balanceOf(funder.address)).to.equal(quantity);
     });
 
     it('Should emit a TicketsMinted event on mint', async function () {
       const { exhibitNFT, owner , funder} = await  loadFixture(deployContracts);
       const quantity = 2;
-      await expect(exhibitNFT.connect(owner).mintTickets(funder.address, quantity))
+      await expect(exhibitNFT.connect(owner).mintTickets([funder.address], [quantity]))
         .to.emit(exhibitNFT, 'TicketsMinted')
         .withArgs(exhibitNFT.target, funder.address, quantity, 0);
     });
@@ -94,7 +94,7 @@ describe('ExhibitNFT', function () {
     it('Should fail if not owner tries to mint', async function () {
       const { exhibitNFT, funder } = await  loadFixture(deployContracts);
       await expect(
-        exhibitNFT.connect(funder).mintTickets(funder.address, 1)
+        exhibitNFT.connect(funder).mintTickets([funder.address], [1])
       ).to.be.revertedWithCustomError(exhibitNFT, "OwnableUnauthorizedAccount");
     });
 
@@ -112,7 +112,7 @@ describe('ExhibitNFT', function () {
     
       // Mint some tokens
       const quantity = 3;
-      await exhibitNFT.connect(owner).mintTickets(owner.address, quantity);
+      await exhibitNFT.connect(owner).mintTickets([owner.address], [quantity]);
     
       // Log the total supply
       const totalSupply = await exhibitNFT.totalSupply();
@@ -124,9 +124,9 @@ describe('ExhibitNFT', function () {
 
     it ('Should fail to mint if exceeding ticket capacity', async function () {
       const { exhibitNFT, owner, funder } = await loadFixture(deployContracts);
-      await exhibitNFT.connect(owner).mintTickets(funder.address, 100);
+      await exhibitNFT.connect(owner).mintTickets([funder.address], [100]);
       await expect(
-        exhibitNFT.connect(owner).mintTickets(funder.address, 1)
+        exhibitNFT.connect(owner).mintTickets([funder.address], [1])
       ).to.be.revertedWith("Exceeds maximum tickets")
     })
   });
