@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 /* Category: Smart Contract
    Purpose: Manages Non-Fungible Tokens (NFTs) representing individual exhibits, ensuring ownership and access rights for event participants. */
 
-import "erc721a/contracts/ERC721A.sol"
+import "erc721a/contracts/ERC721A.sol";
 import "./EventEscrow.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -64,7 +64,7 @@ contract ExhibitNFT is ERC721A, Ownable {
         ticketPrice = _ticketPrice;
         escrow = _escrow;
         baseURI = _baseURI;
-        ticketCapacity = _ticketCapacity
+        ticketCapacity = _ticketCapacity;
 
         location = _location;
         artifactNFTAddress = _artifactNFTAddress;
@@ -80,7 +80,7 @@ contract ExhibitNFT is ERC721A, Ownable {
             _baseURI,
             _location,
             _artifactNFTAddress,
-            _details
+            _details,
             _ticketCapacity
         );
     }
@@ -97,7 +97,7 @@ contract ExhibitNFT is ERC721A, Ownable {
         uint256 startTokenId = _nextTokenId();
         _mint(to, quantity);
 
-        emit TicketsMinted(adress(this), to, quantity, startTokenId);
+        emit TicketsMinted(address(this), to, quantity, startTokenId);
         return startTokenId;
     }
 
