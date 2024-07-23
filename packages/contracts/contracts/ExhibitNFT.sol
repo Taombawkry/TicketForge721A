@@ -93,7 +93,7 @@ contract ExhibitNFT is ERC721A, Ownable {
      */
 
     function mintTickets(address to, uint8 quantity) external onlyOwner returns (uint256) {
-        require (_totalMinted() + quantity <= ticketCapacity, "Exceeds maximum tickets");
+        require (totalSupply() + quantity <= ticketCapacity, "Exceeds maximum tickets");
         uint256 startTokenId = _nextTokenId();
         _mint(to, quantity);
 
