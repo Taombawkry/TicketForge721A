@@ -9,7 +9,7 @@ dotenv.config();
 
 // You should replace these values with your own node URL and private keys
 
-const SEPOLIA_RPC_URL = process.env.RPC_URL;
+const SEPOLIA_RPC_URL = process.env.O_RPC_URL;
 const accounts = process.env.PRIVATE_KEYS?.split(',');
 
 
@@ -31,9 +31,17 @@ const config: HardhatUserConfig = {
     sepolia: {
       url: SEPOLIA_RPC_URL,
       accounts,
-      chainId: 11155111, // Sepolia chain ID
-      gasPrice: 'auto',
+      chainId: 11155420, // Sepolia chain ID
+      gasPrice: 4000000000,
     },
+  },
+
+  gasReporter: {
+    currency: "USD",
+    gasPrice: 100,
+    rst: true,
+    enabled: true,
+    coinmarketcap: "603bd12e-d2f3-4a9f-8c82-d5e346d9d482",
   },
 
 };
