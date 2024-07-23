@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
+import { ExhibitNFT } from "../typechain-types";
 
 describe("Museum Contract Tests", function() {
   async function deployContracts() {
@@ -15,7 +16,7 @@ describe("Museum Contract Tests", function() {
 
     // Deploy USDC token (or another ERC20 token)
     const MockUSDC = await ethers.getContractFactory("MUSDC");
-    const usdcToken = await MockUSDC.connect(buyer).deploy(ethers.parseUnits("200", 6));
+    const usdcToken = await MockUSDC.connect(buyer).deploy(ethers.parseUnits("1000", 6));
 
     const Museum = await ethers.getContractFactory("Museum");
     const museum = await Museum.connect(owner).deploy(usdcToken.target);
@@ -30,16 +31,17 @@ describe("Museum Contract Tests", function() {
 
     await organizerService.organizeExhibit(
      
-      "ExhibitName",
-      "EXB",
+      "ExhibitName", // name
+      "EXB", // symbol
       ethers.parseUnits("50", 6),
-      [beneficiary1.address, beneficiary2.address],
-      [50, 50],
-      "https://api.example.com/nft/",
-      "Lusaka,Zambia",
-      artifactNFT.target,
-      "Lusaka Art Gallery",
-      "Exhibit1"
+      [beneficiary1.address, beneficiary2.address], // beneficiaries
+      [50, 50], // shares
+      "https://api.example.com/nft/", // baseURI
+      "Lusaka,Zambia", // location
+      artifactNFT.target, // ArtifactNFT address
+      "Lusaka Art Gallery", // collection
+      "Exhibit1", // exhibit id
+       100 // ticketCapacity
     );
 
     await organizerService.organizeExhibit(
@@ -53,7 +55,8 @@ describe("Museum Contract Tests", function() {
       "Lusaka,Zambia",
       artifactNFT.target,
       "Lusaka Art Gallery2",
-      "Exhibit2"
+      "Exhibit2",
+       200 
     );
 
     const exhibit1NFTAddress = await organizerService.exhibits("Exhibit1");
@@ -117,24 +120,59 @@ describe("Museum Contract Tests", function() {
     expect(await museum.exhibits("WestWing")).to.equal(exhibit1NFTAddress);
   });
 
-  it("should allow purchasing a ticket", async function() {
+  it("should allow purchasing a single ticket", async function() {
     const { museum, buyer, usdcToken } = await loadFixture(deployContracts);
-    await usdcToken.connect(buyer).approve(museum.target, ethers.parseUnits("50", 6));
-    await museum.connect(buyer).purchaseTicket("WestWing", ethers.parseUnits("50", 6));
+    const ticketQuantity = 1;
+    const ticketPrice = ethers.parseUnits("50", 6) 
+    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
+    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity)); 
+
+    const ExhibitNFT = await ethers.getContractFactory("ExhibitNFT");
+    const exhibit = await ExhibitNFT.attach(await museum.exhibits("WestWing")) as ExhibitNFT;
+    expect(await exhibit.balanceOf(buyer.address)).to.equal(ticketQuantity);
     // Further assertions can be added here like balance checking in ExhibitNFT and emitted events
   });
 
-  it("should verify ticket ownership", async function() {
+  it("should allow purchasing multiple tickets", async function() {
+    const { museum, buyer, usdcToken } = await loadFixture(deployContracts);
+    const ticketQuantity = 3;
+    const ticketPrice = ethers.parseUnits("50", 6);
+    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
+    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity));
+    
+    const ExhibitNFT = await ethers.getContractFactory("ExhibitNFT");
+    const exhibit = ExhibitNFT.attach(await museum.exhibits("WestWing")) as ExhibitNFT;
+    expect(await exhibit.balanceOf(buyer.address)).to.equal(ticketQuantity);
+  });
+
+  it ("should fail when trying to pruchase tickets exceeding capacity", async function() {
+    const {museum, buyer, usdcToken, exhibit1NFTAddress} = await loadFixture(deployContracts);
+
+    const exhibit = await ethers.getContractAt("ExhibitNFT", exhibit1NFTAddress);
+    const ticketCapacity = await exhibit.ticketCapacity();
+    const ticketPrice = ethers.parseUnits("50", 6);
+
+    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * (ticketCapacity + BigInt(1)))
+    await expect(
+      museum.connect(buyer).purchaseTickets("WestWing", ticketCapacity + BigInt(1),  ticketPrice * (ticketCapacity + BigInt(1)))
+     )
+  })
+
+  it("should verify ownership of a single purchased ticket", async function() {
     const { museum, buyer, usdcToken, exhibit1NFTAddress } = await loadFixture(deployContracts);
 
-    ////console.log("exhibit: ", await museum.exhibits("WestWing"), exhibit1NFTAddress);
-    await usdcToken.connect(buyer).approve(museum.target, ethers.parseUnits("50", 6));
-    await museum.connect(buyer).purchaseTicket("WestWing", ethers.parseUnits("50", 6));
+    console.log("exhibit: ", await museum.exhibits("WestWing"), exhibit1NFTAddress);
+
+    const ticketQuantity = 1;
+    const ticketPrice = ethers.parseUnits("50", 6);
+    
+    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
+    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity));
     // const hasTicket = ;
      expect( await museum.verifyTicketOwnership("WestWing", buyer.address)).to.be.true;
   });
 
-  it("should correctly update the escrow balance after ticket purchase", async function() {
+  it("should correctly update the escrow balance after a single ticket purchase", async function() {
     const { museum, buyer, usdcToken, organizerService, exhibit1NFTAddress } = await loadFixture(
       deployContracts
     );
@@ -149,23 +187,46 @@ describe("Museum Contract Tests", function() {
 
     // Approving the Museum contract to spend buyer's USDC
     await usdcToken.connect(buyer).approve(museum.target, ethers.parseUnits("50", 6));
+    
+    const ticketQuantity = 1
+    const ticketPrice = ethers.parseUnits("50", 6);
 
     // Buying a ticket
-    await museum.connect(buyer).purchaseTicket("WestWing", ethers.parseUnits("50", 6));
+    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity));
 
     // Check that the escrow balance has been updated
     const escrowBalance = await usdcToken.balanceOf(escrowAddress);
     expect(escrowBalance).to.equal(ethers.parseUnits("50", 6));
   });
 
+  it("should correctly update the escrow balance after multiple (batch) ticket purchase", async function() {
+    const { museum, buyer, usdcToken, exhibit1NFTAddress } = await loadFixture(deployContracts);
+
+    const exhibit = await ethers.getContractAt("ExhibitNFT", exhibit1NFTAddress);
+    const escrowAddress = await exhibit.escrow();
+
+    const ticketQuantity = 3;
+    const ticketPrice = ethers.parseUnits("50", 6);
+    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
+    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity));
+
+    const escrowBalance = await usdcToken.balanceOf(escrowAddress);
+    expect(escrowBalance).to.equal(ticketPrice * BigInt(ticketQuantity));
+  });
+
+  it  
+
+
   it("should correctly update the escrow balance after funds are distributed", async function() {
     const { museum, buyer, usdcToken, organizerService, exhibit1NFTAddress, beneficiary1 } = await loadFixture(
       deployContracts
     );
     // Buying a ticket
-    await usdcToken.connect(buyer).approve(museum.target, ethers.parseUnits("50", 6));
-    await museum.connect(buyer).purchaseTicket("WestWing", ethers.parseUnits("50", 6));
-
+    const ticketQuantity = 1;
+    const ticketPrice = ethers.parseUnits("50", 6);
+    
+    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
+    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity));
 
     // Getting the escrow address associated with the exhibit
     // Getting the escrow address associated with the exhibit
