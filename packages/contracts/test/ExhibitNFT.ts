@@ -31,7 +31,8 @@ describe('ExhibitNFT', function () {
       'https://api.example.com/nft/', // baseURI
       "Lusaka,Zambia", // location
       artifactNFT.target, // ArtifactNFTAddress
-      "Lusaka Art Gallery" // collection
+      "Lusaka Art Gallery", // collection
+      100, // ticketCapacity
     );
     return {
       exhibitNFT,
@@ -60,35 +61,59 @@ describe('ExhibitNFT', function () {
       const { exhibitNFT, eventEscrow } = await  loadFixture(deployContracts);
       expect(await exhibitNFT.escrow()).to.equal(eventEscrow.target);
     });
+
+    it('Should set the right ticket capacity'), async function () {
+      const { exhibitNFT } = await  loadFixture(deployContracts);
+      expect(await exhibitNFT.ticketCapacity()).to.equal(100);
+
+    }
   });
 
   describe('Minting', function () {
-    it('Should mint a ticket to an address', async function () {
+    it('Should mint multiple tickets to an address', async function () {
       const { exhibitNFT, owner , funder} = await  loadFixture(deployContracts);
-      await exhibitNFT.connect(owner).mintTicket(funder);
-      expect(await exhibitNFT.ownerOf(0)).to.equal(funder.address);
+      const quantity = 3;
+      await exhibitNFT.connect(owner).mintTickets(funder.address, quantity);
+      expect(await exhibitNFT.balanceOf(funder.address)).to.equal(quantity);
     });
 
-    it('Should emit a TicketMinted event on mint', async function () {
+    it('Should mint a single ticket to an address', async function () {
       const { exhibitNFT, owner , funder} = await  loadFixture(deployContracts);
-      await expect(exhibitNFT.connect(owner).mintTicket(funder.address))
-        .to.emit(exhibitNFT, 'TicketMinted')
-        .withArgs(exhibitNFT.target, funder.address, 0);
+      const quantity = 1;
+      await exhibitNFT.connect(owner).mintTickets(funder.address, quantity);
+      expect(await exhibitNFT.balanceOf(funder.address)).to.equal(quantity);
+    });
+
+    it('Should emit a TicketsMinted event on mint', async function () {
+      const { exhibitNFT, owner , funder} = await  loadFixture(deployContracts);
+      const quantity = 2;
+      await expect(exhibitNFT.connect(owner).mintTickets(funder.address, quantity))
+        .to.emit(exhibitNFT, 'TicketsMinted')
+        .withArgs(exhibitNFT.target, funder.address, quantity, 0);
     });
 
     it('Should fail if not owner tries to mint', async function () {
       const { exhibitNFT, funder } = await  loadFixture(deployContracts);
       await expect(
-        exhibitNFT.connect(funder).mintTicket(funder.address)
+        exhibitNFT.connect(funder).mintTickets(funder.address, 1)
       ).to.be.revertedWithCustomError(exhibitNFT, "OwnableUnauthorizedAccount");
     });
 
-    it('Should set the correct tokenURI', async function () {
+    it('Should set the correct tokenURI for multiple tickets', async function () {
       const { exhibitNFT, owner , funder} = await  loadFixture(deployContracts);
-      await expect(exhibitNFT.connect(owner).mintTicket(funder.address))
-        .to.emit(exhibitNFT, 'TicketMinted')
-        .withArgs(exhibitNFT.target, funder.address, 0);
-      expect(await exhibitNFT.tokenURI(0)).to.equal('https://api.example.com/nft/0');
+      const quantity = 3;
+      await expect(exhibitNFT.connect(owner).mintTickets(funder.address, quantity));
+      for (let i = 0; i < quantity; i++){
+      expect(await exhibitNFT.tokenURI(i)).to.equal('https://api.example.com/nft/${i}');
+      }
     });
+
+    it ('Should fail to mint if exceeding ticket capacity', async function () {
+      const { exhibitNFT, owner, funder } = await loadFixture(deployContracts);
+      await exhibitNFT.connect(owner).mintTickets(funder.address, 101);
+      await expect(
+        exhibitNFT.connect(owner).mintTickets(funder.address, 1)
+      ).to.be.revertedWith("Exceeds maximum tickets")
+    })
   });
 });
