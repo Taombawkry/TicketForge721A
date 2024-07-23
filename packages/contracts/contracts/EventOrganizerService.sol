@@ -69,6 +69,7 @@ contract EventOrganizerService is Ownable {
      * @param location The location of the exhibit.
      * @param artifactNFTAddress The address of the ArtifactNFT contract.
      * @param details The collection that the exhibit belongs to.
+     * @param ticketCapacity the maximum number of tickets that can be minted for an exhibit.
      */
     function organizeExhibit(
         string memory name,
@@ -80,7 +81,8 @@ contract EventOrganizerService is Ownable {
         string memory location,
         address artifactNFTAddress,
         string memory details,
-        string memory exhibitId
+        string memory exhibitId,
+        uint8 ticketCapacity
     ) public {
         // Ensure that the exhibit ID has not already been taken
         require(
@@ -95,6 +97,7 @@ contract EventOrganizerService is Ownable {
             shares
         );
 
+        // Create a new ExhibitNFT contract for the exhibit
         ExhibitNFT newExhibit = new ExhibitNFT(
             name,
             symbol,
@@ -104,10 +107,12 @@ contract EventOrganizerService is Ownable {
             baseURI,
             location,
             artifactNFTAddress,
-            details
+            details,
+            ticketCapacity
         );
-        exhibits[exhibitId] = address(newExhibit);
-
+        exhibits[exhibitId] = address(newExhibit);  
+    
+        // Emit an event to signal that the new ExhibitNFT contract has been deployed
         emit ExhibitNFTDeployed(
             exhibitId,
             address(newExhibit),
