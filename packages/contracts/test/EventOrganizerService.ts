@@ -12,7 +12,7 @@ describe("EventOrganizerService Contract Tests", function () {
 
     // Deploy USDC token (or another ERC20 token)
     const MockUSDC = await ethers.getContractFactory("MUSDC");
-    const usdcToken = await MockUSDC.connect(owner).deploy(ethers.parseUnits("200", 6));
+    const usdcToken = await MockUSDC.connect(owner).deploy(ethers.parseUnits("200000", 6));
 
     const Museum = await ethers.getContractFactory("Museum");
     const museum = await Museum.connect(owner).deploy(usdcToken.target);
@@ -54,7 +54,8 @@ describe("EventOrganizerService Contract Tests", function () {
           "Lusaka,Zambia",
           artifactNFT.target,
           "Lusaka Art Gallery",
-          "Exhibit1"
+          "Exhibit1",
+          100
         )
       )
         .to.emit(organizerService, "ExhibitNFTDeployed")
@@ -75,7 +76,8 @@ describe("EventOrganizerService Contract Tests", function () {
         "Lusaka,Zambia",
         artifactNFT.target,
         "Lusaka Art Gallery",
-        "Exhibit1"
+        "Exhibit1",
+        200
       )
 
       const exhibitNFT = await organizerService.connect(owner).exhibits("Exhibit1")
@@ -91,14 +93,14 @@ describe("EventOrganizerService Contract Tests", function () {
         "Lusaka,Zambia",
         artifactNFT.target,
         "Lusaka Art Gallery",
-        "Exhibit1"
+        "Exhibit1",
+        100
       )).to.be.revertedWith("ExhibitID already taken.");
     });
+
     it("Should correctly read state variables of the deployed ExhibitNFT and EventEscrow contracts", async function () {
       const { organizerService, beneficiary1, beneficiary2, museum, owner , artifactNFT} = await loadFixture(deployContracts);
       const ticketPrice = ethers.parseUnits("10", 18);
-
-
 
       // Triggering the event by organizing an exhibit
       await organizerService.organizeExhibit(
@@ -112,7 +114,8 @@ describe("EventOrganizerService Contract Tests", function () {
         "Lusaka,Zambia",
         artifactNFT.target,
         "Lusaka Art Gallery",
-        "Exhibit1"
+        "Exhibit1",
+        50
       );
       const exhibitNFTAddress = await organizerService.connect(owner).exhibits("Exhibit1")
       const exhibitNFT = await ethers.getContractAt("ExhibitNFT", exhibitNFTAddress);
@@ -146,7 +149,8 @@ describe("EventOrganizerService Contract Tests", function () {
         "Lusaka,Zambia",
         artifactNFT.target,
         "Lusaka Art Gallery",
-        "Exhibit1"
+        "Exhibit1",
+        50
       );
       const exhibitNFTAddress = await organizerService.connect(owner).exhibits("Exhibit1")
       const exhibitNFT = await ethers.getContractAt("ExhibitNFT", exhibitNFTAddress);
