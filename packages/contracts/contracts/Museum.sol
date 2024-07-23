@@ -17,6 +17,7 @@ contract Museum is Ownable {
         address exhibitAddress
     );
     event TicketsPurchased(address buyer, address exhibit, uint8 quantity, uint256 startTokenId);
+    event TicketsPurchasedBatch(address buyer, address exhibit, address[] recipients, uint8[] quantities, uint256[] startTokenIds);
     // emmit an event with the contract address, token address, and owner address
     event MuseumCreated(
         address museumAddress,
@@ -45,33 +46,68 @@ contract Museum is Ownable {
         emit ExhibitCurated(address(this), exhibitId, address(exhibit));
     }
 
-    /**
-     * @dev Purchases a ticket for an exhibit.
+     /**
+     * @notice Purchases tickets for a single buyer.
      * @param exhibitId The unique identifier for the exhibit.
-     * @param quantity the number of tickets to purchase.
-     * @param usdcAmount The amount of USDC sent to purchase the ticket.
+     * @param quantity The number of tickets to purchase.
+     * @param usdcAmount The amount of USDC sent to purchase the tickets.
      */
-
-    function purchaseTickets(
-        string memory exhibitId,
-        uint8 quantity,
-        uint256 usdcAmount
-    ) external {
+    function purchaseTickets(string memory exhibitId, uint8 quantity, uint256 usdcAmount) external {
         ExhibitNFT exhibit = exhibits[exhibitId];
         require(address(exhibit) != address(0), "Exhibit does not exist.");
 
         uint256 totalCost = exhibit.ticketPrice() * quantity;
         require(usdcAmount >= totalCost, "Insufficient tokens sent.");
 
-        // Transfer the USDC directly from the buyer to the ExhibitNFT's escrow
         address escrowAddress = address(exhibit.escrow());
         require(usdcToken.transferFrom(msg.sender, escrowAddress, totalCost), "Token transfer failed.");
 
-        // Mint the ticket to the buyer
-        uint256 startTokenId = exhibit.mintTickets(msg.sender, quantity);
+        address[] memory recipients = new address[](1);
+        recipients[0] = msg.sender;
+        uint8[] memory quantities = new uint8[](1);
+        quantities[0] = quantity;
 
-        emit TicketsPurchased(msg.sender, address(exhibit), quantity, startTokenId);
+        uint256[] memory startTokenIds = exhibit.mintTickets(recipients, quantities);
+        emit TicketsPurchased(msg.sender, address(exhibit), quantity, startTokenIds[0]);
     }
+
+    /**
+     * @notice Purchases tickets for multiple recipients.
+     * @param exhibitId The unique identifier for the exhibit.
+     * @param recipients Array of recipient addresses.
+     * @param quantities Array of ticket quantities for each recipient.
+     * @param usdcAmount The total amount of USDC sent to purchase the tickets.
+     */
+    function purchaseTicketsBatch(
+        string memory exhibitId,
+        address[] calldata recipients,
+        uint8[] calldata quantities,
+        uint256 usdcAmount
+    ) external {
+        require(recipients.length == quantities.length, "Mismatched recipients and quantities");
+
+        ExhibitNFT exhibit = exhibits[exhibitId];
+        require(address(exhibit) != address(0), "Exhibit does not exist.");
+
+        uint256 totalQuantity = 0;
+        uint256 totalCost = 0;
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            totalQuantity += quantities[i];
+            totalCost += exhibit.ticketPrice() * quantities[i];
+        }
+
+        require(usdcAmount >= totalCost, "Insufficient tokens sent.");
+        require(exhibit.totalSupply() + totalQuantity <= exhibit.ticketCapacity(), "Exceeds maximum tickets");
+
+        address escrowAddress = address(exhibit.escrow());
+        require(usdcToken.transferFrom(msg.sender, escrowAddress, totalCost), "Token transfer failed.");
+
+        uint256[] memory startTokenIds = exhibit.mintTickets(recipients, quantities);
+
+        emit TicketsPurchasedBatch(msg.sender, address(exhibit), recipients, quantities, startTokenIds);
+    }
+
 
     function verifyTicketOwnership(
         string memory exhibitId,

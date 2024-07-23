@@ -86,19 +86,28 @@ contract ExhibitNFT is ERC721A, Ownable {
     }
 
     /**
-     * @dev Mints a specified quantity of tickets to an address.
-     * @param to Address to mint the tickets to.
-     * @param quantity Number of tickets to mint.
-     * @return startTokenId The ID of the first ticket minted in the batch.
+     * @notice Mints tickets to the specified addresses.
+     * @param to Array of addresses to mint the tickets to.
+     * @param quantities Array of quantities of tickets to mint for each address.
+     * @return startTokenIds Array of IDs of the first tickets minted for each recipient.
      */
-    function mintTickets(address to, uint8 quantity) external onlyOwner returns (uint256 startTokenId) {
-        require(totalSupply() + quantity <= ticketCapacity, "Exceeds maximum tickets");
-        startTokenId = _nextTokenId();
-        _mint(to, quantity);
-
-        // Emit the event to indicate tickets have been minted
-        emit TicketsMinted(address(this), to, quantity, startTokenId);
-        return startTokenId;
+    function mintTickets(address[] calldata to, uint8[] calldata quantities) external onlyOwner returns (uint256[] memory startTokenIds) {
+        require(to.length == quantities.length, "Mismatched address and quantity arrays");
+        
+        startTokenIds = new uint256[](to.length);
+        
+        for (uint256 i = 0; i < to.length; i++) {
+            require(totalSupply() + quantities[i] <= ticketCapacity, "Exceeds maximum tickets");
+            
+            uint256 startTokenId = _nextTokenId();
+            _mint(to[i], quantities[i]);
+            
+            startTokenIds[i] = startTokenId;
+            
+            emit TicketsMinted(address(this), to[i], quantities[i], startTokenId);
+        }
+        
+        return startTokenIds;
     }
 
     function _baseURI() internal view override returns (string memory) {
