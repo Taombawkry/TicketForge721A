@@ -85,18 +85,18 @@ contract ExhibitNFT is ERC721A, Ownable {
         );
     }
 
-    /** 
-     * @dev Mints tickets in batch to the specified address.
+    /**
+     * @dev Mints a specified quantity of tickets to an address.
      * @param to Address to mint the tickets to.
      * @param quantity Number of tickets to mint.
-     * @return startTokenId The ID of the first token minted.
+     * @return startTokenId The ID of the first ticket minted in the batch.
      */
-
-    function mintTickets(address to, uint8 quantity) external onlyOwner returns (uint256) {
-        require (totalSupply() + quantity <= ticketCapacity, "Exceeds maximum tickets");
-        uint256 startTokenId = _nextTokenId();
+    function mintTickets(address to, uint8 quantity) external onlyOwner returns (uint256 startTokenId) {
+        require(totalSupply() + quantity <= ticketCapacity, "Exceeds maximum tickets");
+        startTokenId = _nextTokenId();
         _mint(to, quantity);
 
+        // Emit the event to indicate tickets have been minted
         emit TicketsMinted(address(this), to, quantity, startTokenId);
         return startTokenId;
     }
