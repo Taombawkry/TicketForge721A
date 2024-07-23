@@ -125,38 +125,61 @@ describe("Museum Contract Tests", function() {
     const ticketQuantity = 1;
     const ticketPrice = ethers.parseUnits("50", 6) 
     await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
-    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity)); 
+    const tx00 = await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity)); 
+    const receipt = await tx00
 
     const ExhibitNFT = await ethers.getContractFactory("ExhibitNFT");
     const exhibit = await ExhibitNFT.attach(await museum.exhibits("WestWing")) as ExhibitNFT;
     expect(await exhibit.balanceOf(buyer.address)).to.equal(ticketQuantity);
+
+    console.log(`Gas used for single ticket purchase: ${receipt?.gasUsed}`);
+    console.log(`Gas price at execution: ${receipt?.gasPrice}`);
     // Further assertions can be added here like balance checking in ExhibitNFT and emitted events
   });
 
-  it("should allow purchasing multiple tickets", async function() {
+  it("should allow purchasing multiple tickets in batch", async function() {
     const { museum, buyer, usdcToken } = await loadFixture(deployContracts);
-    const ticketQuantity = 3;
+    const ticketQuantity = 5;
     const ticketPrice = ethers.parseUnits("50", 6);
-    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
-    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity));
+    const totalCost = ticketPrice * BigInt(ticketQuantity);
+
+    await usdcToken.connect(buyer).approve(museum.target, totalCost);
+
+    const recipients = Array(ticketQuantity).fill(buyer.address);
+    const quantities = Array(ticketQuantity).fill(1);
+
+    console.log("recipients:", recipients, "quantities:", quantities );
+
+    const tx01 = await museum.connect(buyer).purchaseTicketsBatch("WestWing", recipients, quantities, totalCost);
+    const receipt = await tx01.wait();
     
     const ExhibitNFT = await ethers.getContractFactory("ExhibitNFT");
     const exhibit = ExhibitNFT.attach(await museum.exhibits("WestWing")) as ExhibitNFT;
     expect(await exhibit.balanceOf(buyer.address)).to.equal(ticketQuantity);
+
+    console.log(`Gas used for batch ticket purchase: ${receipt?.gasUsed}`);
+    console.log(`Gas price at execution: ${receipt?.gasPrice}`);
   });
 
-  it ("should fail when trying to pruchase tickets exceeding capacity", async function() {
-    const {museum, buyer, usdcToken, exhibit1NFTAddress} = await loadFixture(deployContracts);
+  it("should fail when trying to purchase tickets in batch exceeding capacity", async function() {
+    const { museum, buyer, usdcToken, exhibit1NFTAddress } = await loadFixture(deployContracts);
 
     const exhibit = await ethers.getContractAt("ExhibitNFT", exhibit1NFTAddress);
     const ticketCapacity = await exhibit.ticketCapacity();
     const ticketPrice = ethers.parseUnits("50", 6);
 
-    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * (ticketCapacity + BigInt(1)))
+    const excessQuantity = ticketCapacity + BigInt(1);
+    const totalCost = ticketPrice * excessQuantity;
+
+    await usdcToken.connect(buyer).approve(museum.target, totalCost);
+
+    const recipients = Array(Number(excessQuantity)).fill(buyer.address);
+    const quantities = Array(Number(excessQuantity)).fill(1);
+
     await expect(
-      museum.connect(buyer).purchaseTickets("WestWing", ticketCapacity + BigInt(1),  ticketPrice * (ticketCapacity + BigInt(1)))
-     )
-  })
+      museum.connect(buyer).purchaseTicketsBatch("WestWing", recipients, quantities, totalCost)
+    ).to.be.revertedWith("Exceeds maximum tickets");
+  });
 
   it("should verify ownership of a single purchased ticket", async function() {
     const { museum, buyer, usdcToken, exhibit1NFTAddress } = await loadFixture(deployContracts);
@@ -199,7 +222,7 @@ describe("Museum Contract Tests", function() {
     expect(escrowBalance).to.equal(ethers.parseUnits("50", 6));
   });
 
-  it("should correctly update the escrow balance after multiple (batch) ticket purchase", async function() {
+  it("should correctly update the escrow balance after batch ticket purchase", async function() {
     const { museum, buyer, usdcToken, exhibit1NFTAddress } = await loadFixture(deployContracts);
 
     const exhibit = await ethers.getContractAt("ExhibitNFT", exhibit1NFTAddress);
@@ -207,14 +230,18 @@ describe("Museum Contract Tests", function() {
 
     const ticketQuantity = 3;
     const ticketPrice = ethers.parseUnits("50", 6);
-    await usdcToken.connect(buyer).approve(museum.target, ticketPrice * BigInt(ticketQuantity));
-    await museum.connect(buyer).purchaseTickets("WestWing", ticketQuantity, ticketPrice * BigInt(ticketQuantity));
+    const totalCost = ticketPrice * BigInt(ticketQuantity);
+
+    await usdcToken.connect(buyer).approve(museum.target, totalCost);
+
+    const recipients = Array(ticketQuantity).fill(buyer.address);
+    const quantities = Array(ticketQuantity).fill(1);
+
+    await museum.connect(buyer).purchaseTicketsBatch("WestWing", recipients, quantities, totalCost);
 
     const escrowBalance = await usdcToken.balanceOf(escrowAddress);
-    expect(escrowBalance).to.equal(ticketPrice * BigInt(ticketQuantity));
+    expect(escrowBalance).to.equal(totalCost);
   });
-
-  it  
 
 
   it("should correctly update the escrow balance after funds are distributed", async function() {
